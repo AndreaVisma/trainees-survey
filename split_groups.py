@@ -35,7 +35,7 @@ colors_many = ['rgba(39, 120, 245, 0.8)', 'rgba(39, 208, 245, 0.8)',
 
 
 ## change this to the directory where you saved the data
-file_loc = "c://users//avism//desktop//trainees_survey//data_2405//survey_results.xlsx"
+file_loc = os.getcwd() + "data\\survey_results.xlsx"
 
 #load the data in as a dataframe
 survey_data = pd.read_excel(file_loc, usecols = "J:DK")
