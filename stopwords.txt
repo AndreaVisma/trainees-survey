@@ -134,10 +134,6 @@ get
 much
 one
 also
-trainee
-traineeship
-trainees
-ecb
 give
 given
 without
@@ -147,3 +143,11 @@ lot
 might
 someone
 dont
+make
+trainee
+traineeship
+trainees
+nice 
+little
+ecb
+like

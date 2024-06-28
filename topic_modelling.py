@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
-mpl.use('TkAgg')
+mpl.use('QtAgg')
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
@@ -9,6 +9,7 @@ from wordcloud import WordCloud
 import re
 import os
 from pprint import pprint
+from tqdm import tqdm
 
 from collections import Counter
 import matplotlib.colors as mcolors
@@ -24,7 +25,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 ###############
 
 ## change this to the directory where you saved the data
-file_loc = os.getcwd() + "data\\survey_results.xlsx"
+file_loc = os.getcwd() + "\\data\\survey_results.xlsx"
 
 #load the data in as a dataframe
 survey_data = pd.read_excel(file_loc, usecols = "J:DK")
@@ -34,15 +35,23 @@ survey_data = survey_data.drop(0)
 
 ###topic modelling on priorities
 #import words/punctuation to clean
-punctuation = """!"$%&\'()*+,-./:;<=>?[\\]^_`{|}~•@#"""
+punctuation = """!"$%&\'()*+-,./:;<=>?[\\]^_`{|}~•@#"""
 stopwords = open(f"{os.getcwd()}//stopwords.txt", "r").read().split("\n")
 numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 
 #function to cleaning answers for one question
 def clean_answer(answer):
     answer = answer.lower()
+    #fix typos
     answer = re.sub('accomodation', 'accommodation', answer)
-    answer = re.sub('['+punctuation + ']+', '', answer) #strip punctuation
+    answer = re.sub('prices', 'price', answer)
+    answer = re.sub('contracts', 'contract', answer)
+    answer = re.sub('grant', 'salary', answer)
+    answer = re.sub('short term', 'shortterm', answer)
+    answer = re.sub('salaries', 'salary', answer)
+    # answer = re.sub('trainees', 'trainee', answer)
+    ##
+    answer = re.sub('['+punctuation + ']+', ' ', answer) #strip punctuation
     answer = [word for word in answer.split(' ')
      if word not in stopwords]
     answer = [word for word in answer
@@ -83,15 +92,15 @@ def format_topics_sentences(lda_model, corpus, texts):
     sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
     return(sent_topics_df)
 
-def topic_modelling_answer(answer, number_of_topics = 4):
+def topic_modelling_answer(answer, number_of_topics = 5):
     """applies topic modelling to a dataframe series.
     Can be a single answer or a collection of answers. In the
     latter case, these need to first be merged into a single series"""
     series = answer.dropna().apply(lambda x: [clean_answer(x)]).to_list()
 
     # Build the bigram and trigram models
-    bigram = gensim.models.Phrases(series, min_count=5, threshold=10)  # higher threshold fewer phrases.
-    trigram = gensim.models.Phrases(bigram[series], threshold=10)
+    bigram = gensim.models.Phrases(series, min_count=1, threshold=1)  # higher threshold fewer phrases.
+    trigram = gensim.models.Phrases(bigram[series], min_count=1, threshold=1)
     bigram_mod = gensim.models.phrases.Phraser(bigram)
     trigram_mod = gensim.models.phrases.Phraser(trigram)
 
@@ -108,12 +117,9 @@ def topic_modelling_answer(answer, number_of_topics = 4):
     # Build LDA model
     lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
                                                 id2word=id2word,
-                                                num_topics=6,
+                                                num_topics=number_of_topics,
                                                 random_state=100,
-                                                update_every=1,
-                                                chunksize=10,
                                                 passes=8,
-                                                alpha='symmetric',
                                                 iterations=100,
                                                 per_word_topics=True)
 
@@ -175,7 +181,7 @@ def topic_modelling_answer(answer, number_of_topics = 4):
     df = pd.DataFrame(out, columns=['word', 'topic_id', 'importance', 'word_count'])
 
     # Plot Word Count and Weights of Topic Keywords
-    fig, axes = plt.subplots(3, 2, figsize=(8, 5), sharey=True, dpi=160)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 5), sharey=True, dpi=160)
     cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
     for i, ax in enumerate(axes.flatten()):
         ax.bar(x='word', height="word_count", data=df.loc[df.topic_id == i, :], color=cols[i], width=0.5, alpha=0.3,
@@ -199,26 +205,42 @@ def topic_modelling_answer(answer, number_of_topics = 4):
     return df_topic_sents_keywords, df_dominant_topic, df
 
 ### here you select the answer or asnwers you want to do the topic modelling for
-series = survey_data.iloc[:, 4] #col 4 has the open answer for priorities
+col = [1,2,3,4] #first answer on priorities
+series = survey_data.iloc[:, col] #col 4 has the open answer for priorities
+#if more than one column:
+series = pd.concat([series.iloc[:,i] for i in range(len(col))])
 
-try:
-    df_series = pd.DataFrame([])
-    for column in series.columns:
-        df_series = pd.concat([df_series, series[column]])
-except:
-    df_series = pd.DataFrame([])
-
-df_topic_sents_keywords, df_dominant_topic, df_topics = topic_modelling_answer(df_series.iloc[:, 0] if series.size > 300 else series)
-
+df_topic_sents_keywords, df_dominant_topic, df_topics = topic_modelling_answer(series, number_of_topics = 4)
 
 ##worldcloud
-if series.size > 300:
-    series = df_series.iloc[:, 0]
-else:
-    series = series
-text = " ".join(i for i in series.dropna().apply(lambda x: clean_answer(x)))
+for col in tqdm([1,2,3,4]):
+    text = " ".join(i for i in survey_data.iloc[:, col].dropna().apply(lambda x: clean_answer(x)))
+    wordcloud = WordCloud(background_color="white").generate(text)
+    wordcloud.to_file(f'figures\\wordcloud_priority_{col}.png')
+    plt.figure(figsize = (15, 10))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis("off")
+    plt.show()
+
+#wordcloud accommodation
+text = " ".join(survey_data['Unnamed: 76'].dropna().apply(lambda x: clean_answer(x)))
+text = re.sub('residence', '', text)
+text = re.sub('apartments', '', text)
+text = re.sub('apartment', '', text)
+text = re.sub('accommodation', '', text)
+text = re.sub('residenz', '', text)
 wordcloud = WordCloud(background_color="white").generate(text)
-wordcloud.to_file('words.png')
+wordcloud.to_file(f'figures\\wordcloud_accommodations.png')
+plt.figure(figsize = (15, 10))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis("off")
+plt.show()
+
+## wordcloud insurance
+text = " ".join(survey_data['Unnamed: 88'].dropna().apply(lambda x: clean_answer(x)))
+text = re.sub('yet', '', text)
+wordcloud = WordCloud(background_color="white").generate(text)
+wordcloud.to_file(f'figures\\wordcloud_insurance.png')
 plt.figure(figsize = (15, 10))
 plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis("off")

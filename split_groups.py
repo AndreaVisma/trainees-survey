@@ -13,6 +13,7 @@ e.g. we want to know the difference between men and women in answering any quest
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
+import os
 mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -35,7 +36,7 @@ colors_many = ['rgba(39, 120, 245, 0.8)', 'rgba(39, 208, 245, 0.8)',
 
 
 ## change this to the directory where you saved the data
-file_loc = os.getcwd() + "data\\survey_results.xlsx"
+file_loc = os.getcwd() + "\\data\\survey_results.xlsx"
 
 #load the data in as a dataframe
 survey_data = pd.read_excel(file_loc, usecols = "J:DK")
